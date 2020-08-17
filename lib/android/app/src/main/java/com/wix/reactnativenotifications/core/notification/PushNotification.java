@@ -3,11 +3,16 @@ package com.wix.reactnativenotifications.core.notification;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Log;
 
 import com.facebook.react.bridge.ReactContext;
 import com.wix.reactnativenotifications.core.AppLaunchHelper;
@@ -19,6 +24,7 @@ import com.wix.reactnativenotifications.core.JsIOHelper;
 import com.wix.reactnativenotifications.core.NotificationIntentAdapter;
 import com.wix.reactnativenotifications.core.ProxyService;
 
+import static com.wix.reactnativenotifications.Defs.LOGTAG;
 import static com.wix.reactnativenotifications.Defs.NOTIFICATION_OPENED_EVENT_NAME;
 import static com.wix.reactnativenotifications.Defs.NOTIFICATION_RECEIVED_EVENT_NAME;
 
@@ -59,6 +65,10 @@ public class PushNotification implements IPushNotification {
 
     @Override
     public void onReceived() throws InvalidNotificationException {
+    	Bundle manifestMetadata = getManifestMetadata(mContext.getPackageManager(), mContext.getPackageName());
+    	Boolean postNotificationsWhenAppVisible = manifestMetadata.getBoolean("com.wix.reactnativenotifications.post_notifications_when_app_visible");
+    	Log.i(LOGTAG, "onReceived postNotificationsWhenAppVisible:" + postNotificationsWhenAppVisible);
+
         if (!mAppLifecycleFacade.isAppVisible()) {
             postNotification(null);
         }
@@ -155,15 +165,37 @@ public class PushNotification implements IPushNotification {
         setUpIcon(notification);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                    CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_DEFAULT);
-            final NotificationManager notificationManager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
-            notificationManager.createNotificationChannel(channel);
-            notification.setChannelId(CHANNEL_ID);
+        	Bundle manifestMetadata = getManifestMetadata(context.getPackageManager(), context.getPackageName());
+			String manifestDefaultChannelId = manifestMetadata.getString("com.wix.reactnativenotifications.default_notification_channel_id");
+
+			Log.i(LOGTAG, "manifestDefaultChannelId: " + manifestDefaultChannelId);
+
+			if (TextUtils.isEmpty(manifestDefaultChannelId)) {
+				NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
+						CHANNEL_NAME,
+						NotificationManager.IMPORTANCE_DEFAULT);
+				final NotificationManager notificationManager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+				notificationManager.createNotificationChannel(channel);
+				notification.setChannelId(CHANNEL_ID);
+            } else {
+            	notification.setChannelId(manifestDefaultChannelId);
+            }
         }
 
         return notification;
+    }
+
+    private static Bundle getManifestMetadata(PackageManager pm, String packageName) {
+        try {
+            ApplicationInfo info = pm.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+            if (info != null && info.metaData != null) {
+                return info.metaData;
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(LOGTAG, "Couldn't get own application info: " + e);
+        }
+
+        return Bundle.EMPTY;
     }
 
     private void setUpIcon(Notification.Builder notification) {
