@@ -69,7 +69,7 @@ public class PushNotification implements IPushNotification {
     	Boolean postNotificationsWhenAppVisible = manifestMetadata.getBoolean("com.wix.reactnativenotifications.post_notifications_when_app_visible");
     	Log.i(LOGTAG, "onReceived postNotificationsWhenAppVisible:" + postNotificationsWhenAppVisible);
 
-        if (!mAppLifecycleFacade.isAppVisible()) {
+        if (!mAppLifecycleFacade.isAppVisible() || postNotificationsWhenAppVisible) {
             postNotification(null);
         }
         notifyReceivedToJS();
@@ -165,7 +165,7 @@ public class PushNotification implements IPushNotification {
         setUpIcon(notification);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        	Bundle manifestMetadata = getManifestMetadata(context.getPackageManager(), context.getPackageName());
+        	Bundle manifestMetadata = getManifestMetadata(mContext.getPackageManager(), mContext.getPackageName());
 			String manifestDefaultChannelId = manifestMetadata.getString("com.wix.reactnativenotifications.default_notification_channel_id");
 
 			Log.i(LOGTAG, "manifestDefaultChannelId: " + manifestDefaultChannelId);
